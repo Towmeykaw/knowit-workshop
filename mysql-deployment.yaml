@@ -1,0 +1,42 @@
+apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+kind: Deployment
+metadata:
+  name: wordpress-mysql
+  labels:
+    app: wordpress-mysql
+spec:
+  selector:
+    matchLabels:
+      app: wordpress-mysql
+      tier: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: wordpress-mysql
+        tier: mysql
+    spec:
+      containers:
+      - image: mysql:5.6
+        name: mysql
+        lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 30; mysql -e \"CREATE USER 'root'@'%' IDENTIFIED BY 'mysql';\" -D mysql -p$MYSQL_ROOT_PASSWORD; mysql -e \"GRANT ALL PRIVILEGES ON *.* TO 'root'@'%';\" -D mysql -p$MYSQL_ROOT_PASSWORD; mysql -e \"FLUSH PRIVILEGES;\" -D mysql -p$MYSQL_ROOT_PASSWORD;"]
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-pass
+              key: password
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pv-claim
